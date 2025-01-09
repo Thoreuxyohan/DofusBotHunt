@@ -37,7 +37,7 @@ pip install -r requirements.txt
 ## Utilisation
 
 ```bash
-python bot_chasse.py
+python main.py
 ```
 
 ## Fonctionnalités
