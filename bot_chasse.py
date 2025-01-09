@@ -15,7 +15,7 @@ from gestionnaire_zaaps import GestionnaireZaaps
 from navigateur import NavigateurDofus
 
 class BotChasseDofus:
-    def __init__(self):
+    def __init__(self, navigateur):
         self.en_marche = False
         self.touche_pause = 'p'
         self.touche_arret = 'esc'
@@ -30,7 +30,7 @@ class BotChasseDofus:
         chemin_zaaps = os.path.join(os.path.dirname(__file__), 'zaaps.json')
         self.gestionnaire_indices = GestionnaireIndices(chemin_indices)
         self.gestionnaire_zaaps = GestionnaireZaaps(chemin_zaaps)
-        self.navigateur = NavigateurDofus()
+        self.navigateur = navigateur  # Utiliser l'instance passée
         
         # État de la chasse
         self.position_actuelle = None
@@ -176,6 +176,101 @@ class BotChasseDofus:
         screenshot = np.array(ImageGrab.grab())
         return pytesseract.image_to_string(screenshot, lang='fra')
     
+    def verifier_chasse_en_cours(self):
+        """Vérifie si une chasse est déjà en cours"""
+        return self.navigateur.verifier_chasse_en_cours()
+    
+    def demarrer(self):
+        """Démarre le bot de chasse"""
+        print("Démarrage du bot de chasse...")
+        
+        # Vérifier et activer la fenêtre Dofus
+        if not self.navigateur.trouver_fenetre_dofus():
+            print("Impossible de trouver la fenêtre Dofus")
+            return False
+        
+        self.navigateur.activer_fenetre()
+        time.sleep(1)  # Attendre que la fenêtre soit bien active
+        
+        # Vérifier si une chasse est déjà en cours
+        if self.verifier_chasse_en_cours():
+            print("Une chasse est déjà en cours, passage à l'étape 2")
+            return self.aller_vers_chasse()
+        else:
+            print("Aucune chasse en cours, début de l'étape 1...")
+            
+            # Étape 1 : Rentrer dans le havre-sac et récupérer la chasse
+            if not self.ouvrir_havre_sac():
+                print("Impossible d'ouvrir le havre-sac")
+                return False
+            
+            if not self.navigateur.cliquer_zaap():
+                print("Impossible de cliquer sur le zaap")
+                return False
+            
+            if not self.navigateur.aller_champs_cania():
+                print("Impossible d'aller aux Champs de Cania")
+                return False
+            
+            if not self.navigateur.recuperer_chasse():
+                print("Échec de la récupération de la chasse")
+                return False
+
+        # Si aucune chasse n'est trouvée, appeler aller_vers_chasse()
+        return self.aller_vers_chasse()
+    
+    def aller_vers_chasse(self):
+        """Séquence complète pour aller vers la position de la chasse"""
+        print("\nDébut de la séquence de déplacement vers la chasse...")
+        
+        # Vérifier et activer la fenêtre Dofus
+        print("Vérification de la fenêtre Dofus...")
+        if not self.navigateur.trouver_fenetre_dofus():
+            print("Impossible de trouver la fenêtre Dofus")
+            return False
+        
+        self.navigateur.activer_fenetre()
+        time.sleep(1)  # Attendre que la fenêtre soit bien active
+        
+        # 1. Vérifier si on est aux coordonnées -27,-36
+        print("Vérification des coordonnées...")
+        if not self.navigateur.est_a_position(-27, -36):
+            print("Position incorrecte, vérification du havre-sac...")
+            
+            # Vérifier si on est dans le havre-sac
+            print("Vérification du havre-sac...")
+            if not self.navigateur.est_dans_havre_sac():
+                print("Ouverture du havre-sac...")
+                if not self.navigateur.ouvrir_havre_sac():
+                    print("Impossible d'ouvrir le havre-sac")
+                    return False
+            
+            # 2. Cliquer sur le zaap
+            print("Clic sur le zaap...")
+            if not self.navigateur.cliquer_zaap():
+                print("Impossible de cliquer sur le zaap")
+                return False
+            
+            # 3. Entrer 'Champs de Cania'
+            print("Entrée de 'Champs de Cania'...")
+            self.navigateur.entrer_commande_chat("Champs de Cania")
+            keyboard.press_and_release('enter')
+            time.sleep(1)
+            
+            # 4. Se déplacer à -25,-36
+            print("Déplacement vers -25,-36...")
+            self.navigateur.aller_vers_coordonnees(-25, -36)
+            time.sleep(1)
+            
+            # 5. Récupérer la chasse
+            print("Récupération de la chasse...")
+            if not self.navigateur.recuperer_chasse():
+                print("Échec de la récupération de la chasse")
+                return False
+            
+        print(f"Téléportation vers réussie")
+        return True
+    
     def executer(self):
         """Exécute le bot de chasse"""
         print("\nDémarrage du Bot de Chasse Dofus...")
@@ -250,9 +345,10 @@ class BotChasseDofus:
             json.dump(etat, f, indent=2, ensure_ascii=False)
 
 def main():
-    bot = BotChasseDofus()
+    navigateur = NavigateurDofus()
+    bot = BotChasseDofus(navigateur)
     try:
-        bot.executer()
+        bot.demarrer()
     except KeyboardInterrupt:
         print("\nBot interrompu par l'utilisateur")
     finally:
